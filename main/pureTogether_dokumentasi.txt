@@ -1,0 +1,99 @@
+============= DOKUMENTASI SISTEM ROBOT PURETOGETHER =============
+File Utama: main/main.ino
+Platform  : STM32F103C8T6 (Bluepill)
+=================================================================
+
+1. PEMETAAN PIN (PINOUT LENGKAP)
+--------------------------------
+- Sensor Garis (TCRT5000):
+  * Kiri (L)   = PB12
+  * Tengah (C) = PB13
+  * Kanan (R)  = PB14
+
+- Motor DC (MX1508 atau L298N):
+  * Kiri IN1 = PA7
+  * Kiri IN2 = PA6
+  * Kanan IN1 = PA5
+  * Kanan IN2 = PA4
+
+- Indikator LED (RGB):
+  * LED Biru  = PA8
+  * LED Hijau = PA9
+  * LED Merah = PA10
+
+- Sensor Lingkungan & Buzzer:
+  * GP2Y1010AU0F LED (MER)  = PA1
+  * GP2Y1010AU0F AOUT (HIJ) = PA0
+  * Alarm Buzzer            = PB15
+
+- Komunikasi Eksternal:
+  * ESP-01 TX = PA3 (dibaca STM32 sebagai RX)
+  * ESP-01 RX = PA2 (ditulis STM32 sebagai TX)
+
+2. LOGIKA PERGERAKAN LINE FOLLOWER & PID
+--------------------------------
+Robot menggunakan algoritma PID (Proportional & Derivative) yang mengandalkan pembacaan
+3 titik sensor (Kiri, Tengah, Kanan). Nilai error akan memengaruhi penambahan/pengurangan
+PWM (Pulse Width Modulation) ke roda sehingga robot dapat melaju sangat mulus menampik tikungan 
+tajam tanpa pergerakan kaku (tersentak). Seluruh roda bagian kanan dijalankan secara pararel, 
+begitu pula roda bagian kiri, membentuk traksi 4-Wheel Drive yang kuat.
+- baseSpeed = 150 (Kecepatan ditingkatkan agar motor tidak tersendat menggerakkan beban 4WD)
+
+3. STATE MACHINE PEMETAAN & REMOTE KONTROL
+--------------------------------
+Robot memiliki 3 status kerja (STATE):
+- STATE_IDLE: Mode bawaan saat nyala. Robot bergerak menggunakan Line Follower berkecepatan aman.
+- STATE_CALIBRATION: Robot menjadi Line Follower namun sekaligus merekam instruksi belokan panjang titik lurus.
+- STATE_MANUAL: Fitur Remot Kontrol Ekstensif (Motor lepas dari Line Follower).
+
+Perintah Remote Control (Berasal dari URL GET Request Aplikasi Mobile):
+- URL `/mode?val=manual` ---> Ganti ke Remote Control (Lampu sensor garis diabaikan).
+- URL `/mode?val=auto`   ---> Mengembalikan robot menjinak ke mode STATE_IDLE (Line Follower).
+- URL `/cmd?act=fwd`     ---> Maju.
+- URL `/cmd?act=rev`     ---> Mundur.
+- URL `/cmd?act=left`    ---> Memutar ke Kiri.
+- URL `/cmd?act=right`   ---> Memutar ke Kanan.
+- URL `/cmd?act=stop`    ---> Rem darurat / berhenti.
+
+Cara kerja kalibrasi pemetaan "App-Driven" (Diperintah oleh HP):
+1. HP mengirim instruksi via Hotspot (misal: "/start-map").
+2. STM32 menerima perintah tersebut via Serial2, lalu menyalakan "Flag" siaga (isCalibrationRequested = true).
+3. Sebagai visual feedback interaktif, LED 1 dan LED 2 berkedip cahaya BIRU dengan cepat selama 3 kali pendaran.
+4. Perekaman Peta TIDAK LANGSUNG MULAI secara serampangan.
+5. Robot akan menunggu melindas garis "Start/Finish". Barulah saat ketiga sensor mengenai 
+   garis hitam (sL=1, sC=1, sR=1), status secara absolut berubah menjadi STATE_CALIBRATION.
+
+4. SISTEM KESELAMATAN & SENSOR DEBU (AIR QUALITY PATROL)
+--------------------------------
+Mengusung nama "PureTogether", robot juga menanggung fungsi patroli udara ruangan.
+- Setiap 1 detik (1000ms), robot mengecek voltase/analog output dari sensor GP2Y1010AU0F.
+- Jika hasil konversi partikel debu > 100.0 (Bahaya):
+    * Robot seketika mematikan Motor (Mengerem mendadak).
+    * Algoritma Line Follower & Mapping disetop sesaat.
+    * Alarm Buzzer meraung berkedip-kedip dan LED berubah menjadi Merah "AIR: POOR!".
+- Berkat sistem interrupt, saat bahaya debu sudah hilang tertiup angin/berangsur turun < 100.0, 
+  Robot mengembalikan LED ke Hijau dan otomatis melanjutkan perjalanan patrolinya.
+
+5. KOMUNIKASI TELEMETRI (KE ESP Wlan) & FORMAT JSON
+--------------------------------
+Setiap 1 detik, di samping membaca debu, mesin STM32 akan melontarkan pesan lewat Serial2 ke alat WiFi berupa Format DATA:
+> DATA,[Status Udara],[Kepadatan Debu],[Voltase Baterai]
+
+Nantinya data ini bertugas untuk diformat ulang menjadi "JSON" oleh sistem modul ESP Hotspot untuk 
+dibaca secara API endpoint oleh aplikasi Flutter Mobile.
+
+Contoh Output JSON yang akan diterima oleh Smartphone (Flutter):
+{
+  "status": "Aman",
+  "mode": "Remote Manual",
+  "debu_value": 45.23,
+  "battery_voltage": 12.0,
+  "map_data": "L4500,K,L2000,Ki,"
+}
+
+Penjelasan Key JSON:
+- "status" (String) : Kondisi udara sekarang, "Aman" di bawah 100, "Bahaya" di atas ambang batas.
+- "mode" (String) : Indikator sedang berada di state apa ("Garis", "Remote Manual", atau "Mapping Track") agar layar Flutter bisa sinkron menampilkan setelan aktif.
+- "debu_value" (Float) : Hasil ukuran serbuk udara dalam densitas matematis.
+- "battery_voltage" (Float) : Pemantau voltase kelistrikan real-time.
+- "map_data" (String) : Array perintah garis (Langkah lurus - Belok Kanan/Kiri).

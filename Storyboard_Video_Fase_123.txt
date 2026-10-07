@@ -1,0 +1,82 @@
+=============================================================================
+             STORYBOARD & SCRIPT VIDEO PROGRESS PROTOTYPING
+                      ROBOT PURETOGETHER (STM32)
+=============================================================================
+ATURAN UMUM:
+- Format Kamera  : Potrait / Berdiri (9:16)
+- Durasi Minimal : 3 Menit (Setiap Video)
+- Fokus Tampilan : Proses pembuatan, bukan sekadar hasil.
+- Audio          : Boleh pakai narasi langsung (direkam saat itu) atau Voice Over dkk.
+=============================================================================
+
+-----------------------------------------------------------------------------
+[ FASE 1 ] - MECHANICAL & BASIC INTEGRATION (MIN. 3 MENIT)
+-----------------------------------------------------------------------------
+TUJUAN: Pamer struktur dasar dan rancangan awal (Belum perlu bergerak mulus).
+
+[Scene 1] Greetings (00:00 - 00:20)
+- Visual: Salah satu anggota tim (atau semua) masuk ke dalam frame potrait.
+- Script: "Halo, kami dari Tim [Nama Tim Anda]! Pada kesempatan ini kami akan mempresentasikan Progress Fase 1 dari pembuatan Robot PureTogether, yaitu tahap Mekanik dan Integrasi Dasar."
+
+[Scene 2] Proses Perakitan Mekanik & Rangka (00:20 - 01:00)
+- Visual: Tunjukkan video time-lapse, foto, atau peragakan kegiatan memasang baut/menyambung sasis (badan) robot ke modul roda. Tunjukkan rangka utamanya.
+- Script: "Di Fase 1 ini, kami berfokus merampungkan rangka atau sasis utama dari robot. (Jelaskan bahan yang dipakai, misal dari akrilik/PLA/kayu). Ini adalah kerangka kokoh untuk menopang seluruh perangkat keras nantinya."
+
+[Scene 3] Pamer Rangkaian Komponen & Breadboard (01:00 - 01:40)
+- Visual: Kamera nge-zoom (Close up) ke arah susunan kabel di atas prototipe board/PCB bolong. Tunjukkan bagian MCU STM32 dan letak sensor debu.
+- Script: "Untuk rangkaian kontrolernya, saat ini komponen-komponennya seperti STM32 Bluepill, driver motor MX1508, dan sensor-sensornya sudah berhasil kami letakkan dan kami rakit dalam satu papan purupa (prototype board)."
+
+[Scene 4] Proses Integrasi Dasar (Motor & Sensor) (01:40 - 02:20)
+- Visual: Colokkan kabel power. Tunjukkan roda berdesing (berputar) walau sedang diangkat atau ditaruh meja terbalik. Tunjukkan LED sensor garis menyala saat dikasih kertas putih. 
+- Script: "Ini adalah pengujian integrasi awal. Bisa dilihat aktuator (motor roda) sudah bisa dikendalikan oleh instruksi tegangan, sementara sensor TCRT5000 juga sudah mampu bereaksi mendeteksi hitam/putih secara individual."
+
+[Scene 5] Desain Casing di Laptop & Hasil Cetak 3D (02:20 - 03:00+)
+- Visual: Sorot layar laptop yang sedang menampilkan ruang kerja 3D (Tinkercad / Solidworks / Blender). Jika print 3D nya ada di meja, pegang dan tempelkan perlahan ke badan robot (meski bentuknya belum sempurna).
+- Script: "Untuk melengkapi rancang strukturnya, kami mendesain baju pelindung atau casing luar robot ini secara 3D di laptop. Berikut adalah hasil cetaknya sementara dari bahan PLA. Meskipun pinggirannya masih sedikit kasar dan belum di-finishing, bentuk dasarnya sudah bisa terpasang dengan baik."
+
+
+-----------------------------------------------------------------------------
+[ FASE 2 ] - MVP STAGE (MIN. 3 MENIT)
+-----------------------------------------------------------------------------
+TUJUAN: Pembuktian Minimum Viable Product (Sudah ada wujud nyata + Nyala).
+
+[Scene 1] Greetings & Recap Pendek (00:00 - 00:20)
+- Visual: Anggota tim berdiri di dekat set pengujian (Robot dan HP).
+- Script: "Halo kembali bersama kami Tim [Nama Tim]. Di video Fase 2 ini, kami akan memperagakan fitur Minimum Viable Product (MVP) dari PureTogether, di mana software dan hardware kini sudah bersatu!"
+
+[Scene 2] Sistem Baterai, Sensor & Kodingan (00:20 - 01:10)
+- Visual: Perekam memegang baterai atau menunjukkan tempat sarang baterai yang sudah tersambung paten di badan robot. Kamera lalu pindah ke layar laptop yang membuka Arduino IDE (menampilkan file main.ino). Klik tombol 'Upload'.
+- Script: "Untuk MVP, sumber tenaga kini sudah mandiri. Kami telah memasang sistem baterai 12V yang mensuplai daya penuh ke seluruh sistem tanpa perlu dicolok terus ke laptop. Di layar laptop ini merupakan baris program untuk sensor dan integrasi WiFi UDP/Socket kami yang kami unggah ke STM32."
+
+[Scene 3] Hardware + Software Start (01:10 - 02:00)
+- Visual: Letakkan HP (layar terbuka ke menu Flutter / Remote TCP) di samping Robot. Nyalakan dan tekan tombol "Manual Mode" atau "Start Kalibrasi" agar indikator LED Biru di robot berpendar (berkedip).
+- Script: "Bisa Anda lihat, sistem aktuator (hardware) kini bisa menerima instruksi nirkabel. Ketika dari aplikasi mobile kami menekan permintaan, robot merespons menggunakan algoritma yang sudah tertanam, menyalakan sinyal LED biru sebagai feedback sistem."
+
+[Scene 4] Eksekusi Demo Fungsi Dasar (02:00 - 03:00+)
+- Visual: Pancing robot untuk berjalan di atas lakban hitam. Biarkan dia bergerak walau masih ragu-ragu di belokan. Berikan sedikit debu/asap untuk men-trigger berhenti lalu bunyi alarm.
+- Script: "Sebagai pembuktian fungsi utama purupa kami: robot sekarang dapat melakukan Tracking Garis, dan secara bersamaan membaca kualitas udara. Di sini bisa terlihat sistem proteksinya berjalan—robot mengerem otomatis secara real-time bila debu melebihi batas. Semuanya berfungsi dengan baik walau pergerakan rodanya nanti akan kami pertajam (fine-tuning) untuk video rilis akhir."
+
+
+-----------------------------------------------------------------------------
+[ FASE 3 ] - FINAL STAGE / COMPLETED PROTOTYPE (MIN. 3 MENIT)
+-----------------------------------------------------------------------------
+TUJUAN: Pemasaran/Pitching Akhir (Bentuk rapi, Presentasi lengkap, Solutif).
+
+[Scene 1] Greetings & Perkenalan Lengkap (00:00 - 00:30)
+- Visual: Semua anggota tim terlihat jelas dalam frame dengan seragam/pakaian rapi. 
+- Script: "Halo, salam sejahtera! Kami dari Tim [Nama Tim], Program Studi [Nama Prodi], Angkatan [Tahun] dengan bangga mempersembahkan inovasi kami..."
+
+[Scene 2] Problem -> Solusi -> Impact (00:30 - 01:10)
+- Visual: Bisa diselingi animasi pendukung, cuplikan berita debu, atau host menerangkan.
+- Script: "Berawal dari masalah meningkatnya titik buta polutan udara di dalam ruangan perkantoran maupun pabrik (contoh masalah), sehingga kami merancang 'PureTogether', sebuah robot patrol autonomous berbasis STM32 (solusi) supaya sirkulasi keamanan debu karyawan bisa terpantau setiap detik dari layar smartphone mereka (impact)."
+
+[Scene 3] Pamer Fisik Akhir & Penjelasan Cara Kerja (01:10 - 01:50)
+- Visual: Teks "PureTogether Robot". Kamera memperlihatkan robot yang casingnya sudah mulus, kabel rapi tidak berserakan.
+- Script: "Ini adalah wujud akhir dari PureTogether. Robot ini dikendalikan oleh MCU STM32 dan bekerja dengan cara menyambungkan TCP Socket ke aplikasi Mobile. STM32 membaca sensor debu GP2Y10 dan menavigasi dirinya menggunakan Line Follower melalui aktuator motor secara berkesinambungan (Loop)."
+
+[Scene 4] Full Demonstration (Demo Utuh) (01:50 - 03:00+)
+- Visual 1 (Kalibrasi): Rekam adegan tangan user mencet tombol "Start Kalibrasi" di HP -> Robot berkedip -> Melewati garis batas -> Merekam jalur lurus & melengkung tanpa menabrak batas.
+- Visual 2 (Manual): Tekan tombol "Remote Mode", lalu gerakkan seperti RC Car.
+- Visual 3 (Dashboard HP): Kamera ngintip UI HP saat tulisan "Status: AMAN" berubah "Status: BAHAYA" saat asap datang.
+- Script: "Dan berikut adalah demonstrasi utuhnya. Semuanya berjalan tanpa lag, mulai dari merekam pola peta perjalanan (kalibrasi map otomatis), pindah ke remote-control dadakan, hingga laporan status keselamatan yang nge-stream stabil di genggaman Anda. PureTogether, robot patroli masa depan Anda. Terima kasih!"
+=============================================================================

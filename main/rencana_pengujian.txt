@@ -1,0 +1,87 @@
+=====================================================
+RENCANA PENGUJIAN (TEST PLAN) ROBOT PURETOGETHER
+=====================================================
+Dokumen ini berisi skenario pengujian kualitas sistem (QA) setelah
+semua perbaikan logic (EEPROM, Jeda 5s, Failsafe Wi-Fi, & Emote) 
+diterapkan pada firmware STM32 (main.ino) dan Mobile App.
+
+-----------------------------------------------------
+1. PENGUJIAN KALIBRASI GARIS & PENYIMPANAN EEPROM
+-----------------------------------------------------
+Aksi:
+- Jalankan robot di Mode Auto/Line Follower.
+- Tekan "Mulai Kalibrasi" di HP.
+- Biarkan robot membaca garis hitam dari start kembali ke start.
+- Matikan daya (cabut baterai) robot secara total.
+- Nyalakan ulang robot.
+
+Hasil yang Diharapkan (Expected Result):
+- Saat selesai putaran, di layar HP indikator masuk ke "MAPPING DONE".
+- Setelah daya dimatikan lalu dinyalakan ulang, data peta (Map Data)
+  tetap terbaca utuh di memori saat kita me-refresh aplikasi HP.
+  (Data tidak hilang/ter-reset).
+
+-----------------------------------------------------
+2. PENGUJIAN KALIBRASI MANUAL VIA REMOTE
+-----------------------------------------------------
+Aksi:
+- Aktifkan "Mode Manual" via HP.
+- Klik "Mulai Rekam Manual".
+- Mainkan D-PAD (Maju 2x, Belok Kanan 1x) menghindari rintangan.
+- Klik "Simpan Peta".
+
+Hasil yang Diharapkan (Expected Result):
+- Robot bergerak sesuai pijatan D-Pad (tanpa peduli garis putih/hitam lantai).
+- Aplikasi mencatat urutan/durasi komando dan menyimpannya ke memori robot via HTTP.
+- Saat mode "Patroli Jalur Baru" dinyalakan, robot mengulangi durasi gerakan.
+
+-----------------------------------------------------
+3. PENGUJIAN JEDA 5 DETIK SETELAH KALIBRASI
+-----------------------------------------------------
+Aksi:
+- Saat robot mencapai titik *finish* di akhir sesi kalibrasi.
+- Amati tingkah laku motor, lampu, dan buzzer. 
+
+Hasil yang Diharapkan (Expected Result):
+- Roda robot seketika berhenti (PWM 0).
+- Secara otomatis, Lampu RGB akan berkedip/menyala terang dan
+  terdengar bunyi beep notifikasi.
+- Siklus tunggu ini berlangsung tepat selama 5 detik, baru setelahnya
+  robot akan kembali berjalan secara otomatis berpatroli (STATE_IDLE/AUTO).
+
+-----------------------------------------------------
+4. PENGUJIAN FAILSAFE KONEKSI WI-FI (SISTEM REM DARURAT)
+-----------------------------------------------------
+Aksi:
+- Buka HP, hubungkan ke Wi-Fi "PureTogether".
+- Buka aplikasi dan nyalakan "Mode Manual".
+- Tekan terus tombol "Maju" di HP (jangan dilepas), sehingga robot melaju.
+- Secara mendadak, matikan fitur Wi-Fi di HP.
+
+Hasil yang Diharapkan (Expected Result):
+- Setelah koneksi terputus, request HTTP dari HP berhenti terkirim.
+- Dalam maksimal 1.5 detik (tergantung limit Watchdog), sistem di STM32
+  akan menyadari hilangnya komunikasi.
+- Robot LANGSUNG MELAKUKAN PENGEREMAN mendadak dan berhenti total
+  untuk mencegah kecelakaan menabrak properti di depannya.
+
+-----------------------------------------------------
+5. PENGUJIAN FITUR EMOTE & ANIMASI (ENTERTAINMENT)
+-----------------------------------------------------
+Aksi:
+- Robot dalam keadaan santai / berhenti.
+- Tekan tombol aksi "Emote: Angry" di HP.
+- Tekan tombol "Emote: Happy" di HP.
+
+Hasil yang Diharapkan (Expected Result):
+- Angry: Lampu RGB warna Merah berkedip cepat, dan Buzzernya
+  berbunyi kasar/sirene peringatan.
+- Happy: Lampu RGB akan gradasi (Rainbow / berganti Hijau-Biru),
+  dengan lantunan bunyi ritmik ringan.
+- Interface HTTP membaca instruksi ini tanpa mengganggu pembacaan
+  Sensor Debu secara *multitasking*.
+
+=====================================================
+Status Pass/Fail pengujian dapat diisi ketika fitur-fitur
+hardware dihubungkan.
+=====================================================
