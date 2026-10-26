@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../providers/provider.dart';
-import '../providers/robot_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/main_scaffold.dart';
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../providers/provider.dart';
 import '../providers/robot_provider.dart';
 import '../theme/app_theme.dart';
@@ -12,7 +13,25 @@ class MapScreen extends StatelessWidget {
     return Consumer<RobotProvider>(
       builder: (context, provider, _) {
         final data = provider.data;
-        final currentLine = data.currentLine ?? 'B';
+        final hasMap = data.mapData != null && data.mapData!.trim().isNotEmpty;
+        final steps = hasMap
+            ? data.mapData!
+                .split(',')
+                .where((s) => s.isNotEmpty)
+                .map((item) {
+                  if (item.startsWith('L')) {
+                    final ms = int.tryParse(item.substring(1)) ?? 0;
+                    final sec = (ms / 1000.0).toStringAsFixed(1);
+                    return 'Maju ${sec}s';
+                  } else if (item == 'K') {
+                    return 'Belok Lurus Kanan';
+                  } else if (item == 'Ki') {
+                    return 'Belok Lurus Kiri';
+                  }
+                  return item;
+                })
+                .toList()
+            : <String>[];
 
         return Scaffold(
           backgroundColor: AppTheme.background,
@@ -22,11 +41,10 @@ class MapScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header & Legend Row ────────────────────────────────────
+                  // ── Header Row ────────────────────────────────────────────
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Title with Map Icon
                       Row(
                         children: [
                           Container(
@@ -52,24 +70,37 @@ class MapScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const Spacer(),
-
-                      // Top-Right Legend Box
+                      // Status Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          color: hasMap ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: hasMap ? const Color(0xFF86EFAC) : const Color(0xFFCBD5E1),
+                            width: 1,
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildLegendItem('Line A', AppTheme.lineA),
-                            const SizedBox(height: 3),
-                            _buildLegendItem('Line B (Active)', AppTheme.lineB, isBold: true),
-                            const SizedBox(height: 3),
-                            _buildLegendItem('Line C', AppTheme.lineC),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: hasMap ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              hasMap ? 'Peta Aktif' : 'Default Kosong',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: hasMap ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -78,7 +109,7 @@ class MapScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // ── Map Canvas Card ────────────────────────────────────────
+                  // ── Map Canvas Card (Default Bersih dengan Lingkaran Robot) ──
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(6),
@@ -97,8 +128,6 @@ class MapScreen extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
                       child: MapCanvas(
-                        currentLine: currentLine,
-                        checkpoint: data.checkpoint ?? 'B-3',
                         mapData: data.mapData,
                       ),
                     ),
@@ -106,150 +135,17 @@ class MapScreen extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // ── Bottom 2 Info Cards ────────────────────────────────────
-                  Row(
-                    children: [
-                      // Current Line Card
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Current Line',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.place_rounded,
-                                    color: AppTheme.primary,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Line $currentLine',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF0F1E36),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              const Text(
-                                'Auto following',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // Current Checkpoint Card
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Current Checkpoint',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.flag_rounded,
-                                    color: AppTheme.primary,
-                                    size: 18,
-                                  ),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'B-3 (Hallway)',
-                                    style: TextStyle(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF0F1E36),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 3),
-                              Text(
-                                'Next: B-4 (Main Area)',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // ── Calibration & UDP Socket Action Card ───────────────────
+                  // ── Info Card: Status Pemetaan ──────────────────────────────
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: provider.isCalibrating
-                            ? const Color(0xFFF59E0B)
-                            : const Color(0xFFE2E8F0),
-                        width: provider.isCalibrating ? 1.5 : 1.2,
-                      ),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: provider.isCalibrating
-                              ? const Color(0x1AF59E0B)
-                              : Colors.black.withValues(alpha: 0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 10,
                           offset: const Offset(0, 3),
                         ),
@@ -263,187 +159,123 @@ class MapScreen extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: provider.isCalibrating
-                                    ? const Color(0xFFFFF7E6)
-                                    : const Color(0xFFEFF6FF),
+                                color: hasMap ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
-                                provider.isCalibrating
-                                    ? Icons.sensors_rounded
-                                    : Icons.radar_rounded,
-                                color: provider.isCalibrating
-                                    ? const Color(0xFFF59E0B)
-                                    : AppTheme.primary,
+                                hasMap ? Icons.route_rounded : Icons.info_outline_rounded,
+                                color: hasMap ? AppTheme.primary : const Color(0xFF64748B),
                                 size: 18,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    provider.isCalibrating
-                                        ? 'Kalibrasi Peta Berjalan'
-                                        : 'Kalibrasi Pemetaan Jalur',
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF0F1E36),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 1),
-                                  Text(
-                                    provider.isCalibrating
-                                        ? 'Robot siaga menunggu garis Start/Finish'
-                                        : 'Kirim /start-map via HTTP',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // UDP Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: data.connectionStatus == 'ONLINE'
-                                    ? const Color(0xFFE8F8F0)
-                                    : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: data.connectionStatus == 'ONLINE'
-                                          ? const Color(0xFF10B981)
-                                          : const Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'HTTP: ${provider.settings.robotPort}',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: data.connectionStatus == 'ONLINE'
-                                          ? const Color(0xFF10B981)
-                                          : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(width: 10),
+                            Text(
+                              hasMap ? 'Rincian Peta Tersimpan' : 'Informasi Peta',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F1E36),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        // Action Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              if (provider.isCalibrating) {
-                                provider.stopCalibration();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    behavior: SnackBarBehavior.floating,
-                                    margin: const EdgeInsets.all(16),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    content: const Text('Kalibrasi dibatalkan.'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              } else {
-                                final sent = await provider.startCalibration();
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    behavior: SnackBarBehavior.floating,
-                                    margin: const EdgeInsets.all(16),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    backgroundColor: sent ? const Color(0xFF1B68D2) : const Color(0xFFF59E0B),
-                                    content: Text(
-                                      sent
-                                          ? 'Perintah /start-map berhasil dikirim via HTTP ke ${provider.settings.robotIp}:${provider.settings.robotPort}!'
-                                          : 'Gagal mengirim HTTP Request (cek koneksi Wi-Fi ke robot)',
+                        const SizedBox(height: 10),
+                        if (hasMap) ...[
+                          Text(
+                            'Robot memiliki ${steps.length} segmen rute hasil Manual Mapping yang tersimpan.',
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                          ),
+                          const SizedBox(height: 10),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (int i = 0; i < steps.length; i++) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: steps[i].startsWith('Maju')
+                                          ? const Color(0xFFEFF6FF)
+                                          : const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: steps[i].startsWith('Maju')
+                                            ? const Color(0xFFBFDBFE)
+                                            : const Color(0xFFFDE68A),
+                                      ),
                                     ),
-                                    duration: const Duration(seconds: 2),
+                                    child: Text(
+                                      steps[i],
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: steps[i].startsWith('Maju')
+                                            ? const Color(0xFF1D4ED8)
+                                            : const Color(0xFFB45309),
+                                      ),
+                                    ),
                                   ),
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: provider.isCalibrating
-                                  ? const Color(0xFFEF4444)
-                                  : AppTheme.primary,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 11),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            icon: Icon(
-                              provider.isCalibrating
-                                  ? Icons.stop_circle_rounded
-                                  : Icons.play_arrow_rounded,
-                              size: 18,
-                            ),
-                            label: Text(
-                              provider.isCalibrating
-                                  ? 'Hentikan Kalibrasi'
-                                  : 'Mulai Kalibrasi (/start-map)',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
+                                  if (i < steps.length - 1)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 4),
+                                      child: Icon(Icons.arrow_forward_rounded,
+                                          size: 11, color: Color(0xFF94A3B8)),
+                                    ),
+                                ],
+                              ],
                             ),
                           ),
-                        ),
+                        ] else ...[
+                          const Text(
+                            'Belum ada rute lintasan yang tersimpan. Gunakan fitur Manual Mapping (Rekam Rute Manual) di menu Kontrol untuk merekam jalur.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF64748B),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 14),
+
+                  // ── Action Button: Sinkronkan Peta dari Robot ──────────────
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: Color(0xFF93C5FD)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.sync_rounded, size: 18),
+                      label: const Text(
+                        'Sinkronkan Peta dari Robot',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        provider.fetchTelemetryOnce();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Meminta data rute peta terbaru dari robot...'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildLegendItem(String label, Color color, {bool isBold = false}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 14,
-          height: 3.5,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: const Color(0xFF334155),
-          ),
-        ),
-      ],
     );
   }
 }

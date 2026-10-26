@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/robot_data.dart';
 import '../providers/provider.dart';
 import '../providers/robot_provider.dart';
 import '../theme/app_theme.dart';
@@ -21,15 +20,18 @@ class _AlertsScreenState extends State<AlertsScreen> {
   Widget build(BuildContext context) {
     return Consumer<RobotProvider>(
       builder: (context, provider, _) {
-        final allAlerts = provider.alerts.isNotEmpty
-            ? provider.alerts
-            : _wireframeDefaultAlerts();
+        final allAlerts = provider.alerts;
 
         final filteredAlerts = allAlerts.where((a) {
           if (_selectedFilter == 'All') return true;
           if (_selectedFilter == 'Warnings') return a.type == 'BATTERY_LOW' || a.type == 'DUST_HIGH';
           if (_selectedFilter == 'Errors') return a.type == 'ROBOT_OFFLINE';
-          if (_selectedFilter == 'Info') return a.type == 'PATROL_FINISHED' || a.type == 'AIR_NORMAL';
+          if (_selectedFilter == 'Info') {
+            return a.type == 'PATROL_FINISHED' ||
+                a.type == 'AIR_NORMAL' ||
+                a.type == 'ROBOT_ONLINE' ||
+                a.type == 'MANUAL_MAP';
+          }
           return true;
         }).toList();
 
@@ -43,28 +45,53 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.notifications_rounded,
-                          color: AppTheme.primary,
-                          size: 22,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_rounded,
+                              color: AppTheme.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Alerts & History',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F1E36),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Alerts & History',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F1E36),
+                      if (allAlerts.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            provider.clearAlerts();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Riwayat peringatan dibersihkan'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Hapus Semua',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFEF4444),
+                            ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -119,10 +146,40 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 // ── Alerts List ──────────────────────────────────────────
                 Expanded(
                   child: filteredAlerts.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Tidak ada notifikasi dalam filter ini',
-                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF1F5F9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.notifications_none_rounded,
+                                  size: 36,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Belum ada notifikasi baru',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Semua parameter robot berjalan normal & aman.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
                         )
                       : ListView.separated(
@@ -138,44 +195,5 @@ class _AlertsScreenState extends State<AlertsScreen> {
         );
       },
     );
-  }
-
-  static List<AlertEntry> _wireframeDefaultAlerts() {
-    final now = DateTime.now();
-    return [
-      AlertEntry(
-        id: '1',
-        type: 'DUST_HIGH',
-        timestamp: DateTime(now.year, now.month, now.day, 10, 24),
-        message: 'Dust sensor reading above threshold (120 µg/m³)',
-        dustLevel: 120,
-      ),
-      AlertEntry(
-        id: '2',
-        type: 'ROBOT_OFFLINE',
-        timestamp: DateTime(now.year, now.month, now.day, 9, 18),
-        message: 'Lost connection with robot',
-      ),
-      AlertEntry(
-        id: '3',
-        type: 'BATTERY_LOW',
-        timestamp: DateTime(now.year, now.month, now.day, 8, 47),
-        message: 'Battery at 20%. Please recharge.',
-        batteryPercent: 20,
-      ),
-      AlertEntry(
-        id: '4',
-        type: 'PATROL_FINISHED',
-        timestamp: DateTime(now.year, now.month, now.day - 1, 17, 32),
-        message: 'Line B patrol completed successfully',
-      ),
-      AlertEntry(
-        id: '5',
-        type: 'AIR_NORMAL',
-        timestamp: DateTime(now.year, now.month, now.day - 1, 14, 14),
-        message: 'Dust level is now 18 µg/m³',
-        dustLevel: 18,
-      ),
-    ];
   }
 }

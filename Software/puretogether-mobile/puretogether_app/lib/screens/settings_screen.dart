@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/robot_data.dart';
 import '../providers/provider.dart';
 import '../providers/robot_provider.dart';
 import '../theme/app_theme.dart';
-import 'http_debug_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -225,73 +225,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ── Group 3: Map & Navigation ───────────────────────────
-                  _buildSectionTitle('Map & Navigation'),
+                  // ── Group: Sensor Testing & Simulasi (Bypass Sensor) ─────
+                  _buildSectionTitle('Sensor Testing & Simulasi (Bypass Sensor)'),
                   const SizedBox(height: 8),
                   _buildGroupCard([
                     _buildSettingsRow(
-                      icon: Icons.map_outlined,
-                      title: 'Map Configuration',
-                      trailing: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 20,
-                      ),
-                      onTap: () {},
-                    ),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    _buildSettingsRow(
-                      icon: Icons.tune_rounded,
-                      title: 'Line Settings',
-                      trailing: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 20,
-                      ),
-                      onTap: () {},
-                    ),
-                  ]),
-
-                  const SizedBox(height: 20),
-
-                  // ── Group 4: Device Information ─────────────────────────
-                  _buildSectionTitle('Device Information'),
-                  const SizedBox(height: 8),
-                  _buildGroupCard([
-                    _buildSettingsRow(
-                      icon: Icons.info_outline_rounded,
-                      title: 'About Robot',
-                      trailing: const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 20,
-                      ),
-                      onTap: () {},
-                    ),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    _buildSettingsRow(
-                      icon: Icons.terminal_rounded,
-                      title: 'Live HTTP Debug Monitor',
+                      icon: Icons.science_rounded,
+                      title: 'Skenario Uji Sensor Debu',
+                      subtitle: provider.isScenarioActive
+                          ? 'Simulasi Aktif: ${_getActiveScenarioTitle(provider.activeScenarioId)}'
+                          : 'Hardware Sensor Fisik Aktif (Default)',
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(6),
+                              color: provider.isScenarioActive
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: provider.isScenarioActive
+                                    ? const Color(0xFFFDE68A)
+                                    : const Color(0xFFE2E8F0),
+                              ),
                             ),
-                            child: const Text(
-                              'Terminal',
+                            child: Text(
+                              provider.isScenarioActive ? 'SIMULASI' : 'REAL HW',
                               style: TextStyle(
                                 fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.primary,
+                                fontWeight: FontWeight.w800,
+                                color: provider.isScenarioActive
+                                    ? const Color(0xFFB45309)
+                                    : const Color(0xFF64748B),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           const Icon(
                             Icons.chevron_right_rounded,
                             color: Color(0xFF94A3B8),
@@ -299,11 +270,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
+                      onTap: () => _showTestScenariosSheet(context, provider),
+                    ),
+                    if (provider.isScenarioActive) ...[
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFD97706)),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Data sensor sedang dibypass dengan data skenario pengujian.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                              ),
+                            ),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                provider.clearTestScenario();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Simulasi dihentikan. Kembali ke sensor fisik.'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              child: const Text('Reset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ]),
+
+                  const SizedBox(height: 20),
+
+                  // ── Group 3: Device Information ─────────────────────────
+                  _buildSectionTitle('Device Information'),
+                  const SizedBox(height: 8),
+                  _buildGroupCard([
+                    _buildSettingsRow(
+                      icon: Icons.info_outline_rounded,
+                      title: 'About Robot',
+                      subtitle: 'PureTogether • STM32 Bluepill & ESP-01',
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF94A3B8),
+                        size: 20,
+                      ),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const HttpDebugScreen()),
+                        showAboutDialog(
+                          context: context,
+                          applicationName: 'PureTogether',
+                          applicationVersion: '2.0.0 (STM32 + ESP8266)',
+                          applicationLegalese: 'Air Quality Patrol Robot with Smart Mapping',
                         );
                       },
                     ),
@@ -385,6 +411,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSettingsRow({
     required IconData icon,
     required String title,
+    String? subtitle,
     required Widget trailing,
     VoidCallback? onTap,
   }) {
@@ -398,19 +425,255 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Icon(icon, color: const Color(0xFF0F1E36), size: 20),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0F1E36),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F1E36),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             trailing,
           ],
         ),
       ),
+    );
+  }
+
+  String _getActiveScenarioTitle(String? id) {
+    if (id == null) return 'Hardware Fisik';
+    try {
+      final s = predefinedTestScenarios.firstWhere((item) => item.id == id);
+      return s.name;
+    } catch (_) {
+      return id;
+    }
+  }
+
+  void _showTestScenariosSheet(BuildContext context, RobotProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.science_rounded, color: Color(0xFFD97706), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Skenario Pengujian Sensor',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F1E36),
+                          ),
+                        ),
+                        Text(
+                          'Bypass sensor fisik jika kabel/wiring bermasalah',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: predefinedTestScenarios.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, idx) {
+                    final scenario = predefinedTestScenarios[idx];
+                    final isSelected = provider.activeScenarioId == scenario.id;
+
+                    Color badgeColor;
+                    Color badgeTextColor;
+                    IconData icon;
+                    if (scenario.id == 'clean_air') {
+                      badgeColor = const Color(0xFFDCFCE7);
+                      badgeTextColor = const Color(0xFF15803D);
+                      icon = Icons.eco_rounded;
+                    } else if (scenario.id == 'warning_air') {
+                      badgeColor = const Color(0xFFFEF3C7);
+                      badgeTextColor = const Color(0xFFB45309);
+                      icon = Icons.warning_amber_rounded;
+                    } else if (scenario.id == 'danger_air') {
+                      badgeColor = const Color(0xFFFEE2E2);
+                      badgeTextColor = const Color(0xFFB91C1C);
+                      icon = Icons.error_outline_rounded;
+                    } else if (scenario.id == 'low_battery') {
+                      badgeColor = const Color(0xFFFFEDD5);
+                      badgeTextColor = const Color(0xFFC2410C);
+                      icon = Icons.battery_alert_rounded;
+                    } else {
+                      badgeColor = const Color(0xFFDBEAFE);
+                      badgeTextColor = const Color(0xFF1D4ED8);
+                      icon = Icons.map_rounded;
+                    }
+
+                    return InkWell(
+                      onTap: () {
+                        provider.applyTestScenario(scenario);
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AppTheme.primary,
+                            content: Text('Skenario "${scenario.name}" diaktifkan!'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSelected ? AppTheme.primary : const Color(0xFFE2E8F0),
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: badgeColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(icon, color: badgeTextColor, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        scenario.name,
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected ? AppTheme.primary : const Color(0xFF0F1E36),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: badgeColor,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          '${scenario.dustLevel.toInt()} µg/m³',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: badgeTextColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    scenario.subtitle,
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20)
+                            else
+                              const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 20),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (provider.isScenarioActive)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.power_settings_new_rounded, size: 18),
+                    label: const Text('Reset ke Hardware Nyata (Bypass Mati)', style: TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: () {
+                      provider.clearTestScenario();
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Bypass dinonaktifkan. Menggunakan sensor fisik asli.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -525,32 +788,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'HTTP Port',
-                  hintText: '80',
+                  hintText: '8888',
                   border: OutlineInputBorder(),
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: const BorderSide(color: Color(0xFF93C5FD)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.terminal_rounded, size: 16),
-                  label: const Text('Buka Live Debug Monitor'),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const HttpDebugScreen()),
-                    );
-                  },
                 ),
               ),
             ],
@@ -567,7 +808,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
-                final port = int.tryParse(portCtrl.text.trim()) ?? 80;
+                final port = int.tryParse(portCtrl.text.trim()) ?? 8888;
                 final ip = ipCtrl.text.trim();
                 provider.updateSettings(
                   provider.settings.copyWith(

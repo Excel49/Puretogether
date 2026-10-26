@@ -48,6 +48,22 @@ class AlertItemWidget extends StatelessWidget {
         iconData = Icons.info_rounded;
         titleText = 'Patrol finished';
         break;
+      case 'MANUAL_MAP':
+        cardBg = const Color(0xFFF0F9FF); // Soft blue
+        borderColor = const Color(0xFFBAE6FD);
+        accentColor = const Color(0xFF0284C7);
+        iconCircleBg = const Color(0xFFE0F2FE);
+        iconData = Icons.map_rounded;
+        titleText = 'Manual mapping';
+        break;
+      case 'ROBOT_ONLINE':
+        cardBg = const Color(0xFFF0FDF4); // Soft green
+        borderColor = const Color(0xFFBBF7D0);
+        accentColor = const Color(0xFF16A34A);
+        iconCircleBg = const Color(0xFFDCFCE7);
+        iconData = Icons.wifi_rounded;
+        titleText = 'Robot connected';
+        break;
       case 'AIR_NORMAL':
       default:
         cardBg = const Color(0xFFF0FDF4); // Soft green

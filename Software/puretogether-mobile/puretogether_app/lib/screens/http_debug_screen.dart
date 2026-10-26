@@ -208,7 +208,7 @@ class _HttpDebugScreenState extends State<HttpDebugScreen> {
                     padding: const EdgeInsets.all(14),
                     child: Row(
                       children: [
-                        // Button 1: Kirim Test /start-map
+                        // Button 1: Toggle Rekam Manual Map
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
@@ -219,27 +219,24 @@ class _HttpDebugScreenState extends State<HttpDebugScreen> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            icon: const Icon(Icons.send_rounded, size: 16),
+                            icon: const Icon(Icons.map_rounded, size: 16),
                             label: const Text(
-                              'Kirim /start-map',
+                              'Test Manual Map',
                               style: TextStyle(
                                   fontSize: 12.5, fontWeight: FontWeight.w700),
                             ),
-                            onPressed: () async {
-                              final ok = await provider.startCalibration();
-                              if (!context.mounted) return;
+                            onPressed: () {
+                              provider.toggleManualRecording();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   behavior: SnackBarBehavior.floating,
                                   margin: const EdgeInsets.all(16),
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10)),
-                                  backgroundColor: ok
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFFEF4444),
-                                  content: Text(ok
-                                      ? 'Terkirim via HTTP!'
-                                      : 'Gagal kirim HTTP request'),
+                                  backgroundColor: const Color(0xFF10B981),
+                                  content: Text(provider.isRecordingManual
+                                      ? 'Rekam rute manual dimulai!'
+                                      : 'Rekam rute manual disimpan ke robot!'),
                                   duration: const Duration(seconds: 2),
                                 ),
                               );

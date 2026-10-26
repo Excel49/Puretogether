@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -29,9 +30,23 @@ class HttpLogEntry {
   }
 }
 
-/// Service untuk menangani komunikasi jaringan menggunakan HTTP GET polling
+/// Request task dalam antrian sequential
+class _QueuedRequest {
+  final String endpoint;
+  final Completer<bool> completer;
+  final DateTime queuedAt;
+
+  _QueuedRequest({
+    required this.endpoint,
+    required this.completer,
+    required this.queuedAt,
+  });
+}
+
+/// Service untuk menangani komunikasi jaringan menggunakan HTTP GET
+/// dengan antrian sequential (Zero Collision) dan telemetri nebeng (Piggybacking).
 class HttpRobotService {
-  static const int defaultPort = 80;
+  static const int defaultPort = 8888;
   static const String defaultRobotIp = '192.168.4.1';
 
   Timer? _pollingTimer;
@@ -40,11 +55,15 @@ class HttpRobotService {
   String _robotIp = defaultRobotIp;
   int _port = defaultPort;
   bool _isConnected = false;
-  bool _isRequesting = false; // Mutex untuk cegah tabrakan koneksi
 
   int _requestsReceived = 0;
   int _requestsSent = 0;
   final List<HttpLogEntry> _logs = [];
+
+  // Antrian sequential: menjamin TIDAK PERNAH ada 2 request bersamaan ke ESP-01
+  final Queue<_QueuedRequest> _queue = Queue<_QueuedRequest>();
+  bool _isProcessingQueue = false;
+  DateTime _lastCommandSentTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   final StreamController<RobotData> _telemetryController =
       StreamController<RobotData>.broadcast();
@@ -69,6 +88,23 @@ class HttpRobotService {
 
   String get _baseUrl => 'http://$_robotIp:$_port';
 
+  bool _isOneWayManualMode = false; // Default false: langsung polling telemetri saat aplikasi dibuka
+
+  bool get isOneWayManualMode => _isOneWayManualMode;
+  set isOneWayManualMode(bool value) {
+    if (_isOneWayManualMode != value) {
+      _isOneWayManualMode = value;
+      debugPrint('[HTTP] One-way manual mode: $value');
+      if (value) {
+        // Saat mode manual aktif, matikan watchdog dan kunci status pasti ONLINE!
+        _watchdogTimer?.cancel();
+        _setConnected(true);
+      } else {
+        _resetWatchdog();
+      }
+    }
+  }
+
   /// Memulai polling HTTP ke Robot
   Future<bool> startPolling(
       {String robotIp = defaultRobotIp, int port = defaultPort}) async {
@@ -80,39 +116,155 @@ class HttpRobotService {
     _addLog(
       direction: 'SYS',
       source: _baseUrl,
-      payload: 'HTTP Polling Started. Connecting to STM32/ESP-01...',
+      payload: 'HTTP Service Started on $_baseUrl (Anti-Collision Engine)',
     );
 
     debugPrint('[HTTP] Polling started for $_baseUrl');
 
-    // Poll setiap 1.5 detik agar ESP-01 tidak ngos-ngosan
-    _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
-      _fetchTelemetry();
+    // Langsung lakukan 1x request awal seketika agar status cepat berubah ONLINE
+    _checkAndPollTelemetry();
+
+    // Poll setiap 1.5 detik jika robot sedang menganggur (idle)
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      _checkAndPollTelemetry();
     });
 
     _resetWatchdog();
     return true;
   }
 
-  Future<void> _fetchTelemetry() async {
-    if (_isRequesting) return; // Skip polling jika ada request lain
-    _isRequesting = true;
-    try {
-      // Endpoint root '/' merespons dengan JSON status terkini
-      final response = await http.get(Uri.parse('$_baseUrl/')).timeout(
-            const Duration(milliseconds: 1500),
-          );
-
-      _handleIncomingResponse(response.body);
-    } catch (e) {
-      debugPrint('[HTTP Polling Error] $e');
-      _setConnected(false);
-    } finally {
-      // JEDA 400ms sebelum ngebolehin request lain jalan
-      Future.delayed(const Duration(milliseconds: 400), () {
-        _isRequesting = false;
-      });
+  /// Polling telemetri hanya dilakukan jika tidak sedang aktif mengemudikan robot
+  void _checkAndPollTelemetry() {
+    // Mode 1-Arah Murni: Matikan total request telemetri saat kemudi manual aktif
+    // agar 100% bandwidth ESP-01 dikhususkan untuk kendali tombol tanpa penumpukan data
+    if (_isOneWayManualMode) {
+      return;
     }
+
+    // Jika ada request perintah dalam 2.5 detik terakhir, abaikan polling sensor
+    final timeSinceLastCmd =
+        DateTime.now().difference(_lastCommandSentTime).inMilliseconds;
+    if (timeSinceLastCmd < 2500) {
+      return;
+    }
+
+    // Jika antrian sudah terisi atau sedang sibuk, lewati putaran ini
+    if (_queue.isNotEmpty || _isProcessingQueue) {
+      return;
+    }
+
+    // Kirim request telemetri ringan
+    sendCommand('/', isTelemetryPoll: true);
+  }
+
+  /// Mengirim command GET request ke robot dengan antrian serial non-blocking
+  Future<bool> sendCommand(String endpoint,
+      {bool isTelemetryPoll = false}) async {
+    final completer = Completer<bool>();
+
+    // Jika perintah adalah STOP atau DARURAT, prioritaskan di paling depan antrian
+    if (endpoint.contains('act=stop')) {
+      // Buang semua antrian perintah gerak lama yang belum sempat terkirim
+      _queue.removeWhere((item) => item.endpoint.contains('/cmd?act='));
+      _queue.addFirst(_QueuedRequest(
+        endpoint: endpoint,
+        completer: completer,
+        queuedAt: DateTime.now(),
+      ));
+    } else if (endpoint.contains('/cmd?act=')) {
+      // Untuk perintah gerak manual, selalu ganti perintah gerak lama di antrian agar tidak menumpuk delay!
+      _queue.removeWhere((item) => item.endpoint.contains('/cmd?act='));
+      _queue.addLast(_QueuedRequest(
+        endpoint: endpoint,
+        completer: completer,
+        queuedAt: DateTime.now(),
+      ));
+    } else {
+      if (_queue.length >= 2 && !isTelemetryPoll) {
+        final dropped = _queue.removeFirst();
+        dropped.completer.complete(false);
+      }
+      _queue.addLast(_QueuedRequest(
+        endpoint: endpoint,
+        completer: completer,
+        queuedAt: DateTime.now(),
+      ));
+    }
+
+    if (!isTelemetryPoll) {
+      _lastCommandSentTime = DateTime.now();
+    }
+
+    _processQueue();
+    return completer.future;
+  }
+
+  /// Memproses item antrian satu per satu (Mencegah collision di ESP-01)
+  Future<void> _processQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
+
+    while (_queue.isNotEmpty) {
+      final req = _queue.removeFirst();
+      final url = '$_baseUrl${req.endpoint}';
+      final isMotorCmd = req.endpoint.contains('/cmd?act=');
+
+      try {
+        _requestsSent++;
+        _addLog(direction: 'OUT', source: url, payload: 'GET ${req.endpoint}');
+        debugPrint('[HTTP Out] GET ${req.endpoint}');
+
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Connection': 'close',
+          },
+        ).timeout(
+          // Untuk perintah motor, timeout super singkat (250ms) karena STM32 langsung menutup socket (Zero-Delay)
+          Duration(milliseconds: isMotorCmd ? 250 : 2000),
+        );
+
+        if (response.statusCode == 200) {
+          // Jika sedang di mode Manual 1-Arah, abaikan data balasan sama sekali!
+          if (!_isOneWayManualMode && !isMotorCmd) {
+            _handleIncomingResponse(response.body);
+          }
+          if (!req.completer.isCompleted) {
+            req.completer.complete(true);
+          }
+        } else {
+          if (!req.completer.isCompleted) {
+            req.completer.complete(false);
+          }
+        }
+      } catch (e) {
+        // Saat mode manual (atau perintah motor), JANGAN PERNAH ubah status menjadi OFFLINE!
+        // Begitu di mode manual, status dikunci tetap ONLINE tanpa pengecekan konektivitas.
+        if (_isOneWayManualMode || isMotorCmd) {
+          _setConnected(true);
+          if (!req.completer.isCompleted) {
+            req.completer.complete(true);
+          }
+        } else {
+          _addLog(
+            direction: 'ERR',
+            source: 'SEND',
+            payload: 'Gagal GET "${req.endpoint}": $e',
+            isError: true,
+          );
+          debugPrint('[HTTP Exception] ${req.endpoint}: $e');
+          _setConnected(false); // Hanya ubah OFFLINE jika di luar mode manual
+          if (!req.completer.isCompleted) {
+            req.completer.complete(false);
+          }
+        }
+      }
+
+      // Jeda nafas singkat 10ms antar paket
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+
+    _isProcessingQueue = false;
   }
 
   /// Menangani respons teks dari Robot
@@ -122,14 +274,11 @@ class HttpRobotService {
       _requestsReceived++;
       _rawMessageController.add(trimmed);
 
-      // Add to log occasionally or every time if you want verbose logs
-      // _addLog(direction: 'IN', source: _baseUrl, payload: trimmed);
-
       _setConnected(true);
       _resetWatchdog();
 
       // Coba parse sebagai JSON:
-      // {"status":"Aman", "mode":"Garis", "debu_value":45.2, "battery_voltage":12.0, "map_data":"..."}
+      // {"status":"Aman","mode":"Remote Manual","debu_value":45.2,"battery_voltage":12.0,...}
       if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
         final Map<String, dynamic> json = jsonDecode(trimmed);
         final robotData = RobotData.fromHardwareJson(json);
@@ -141,10 +290,11 @@ class HttpRobotService {
     } catch (e) {
       debugPrint('[HTTP Parse Error] Error decoding JSON: $e');
       _addLog(
-          direction: 'ERR',
-          source: 'PARSER',
-          payload: 'Error parsing: $e',
-          isError: true);
+        direction: 'ERR',
+        source: 'PARSER',
+        payload: 'Error parsing: $e',
+        isError: true,
+      );
     }
   }
 
@@ -154,7 +304,10 @@ class HttpRobotService {
       _requestsReceived++;
       _rawMessageController.add(sampleJson);
       _addLog(
-          direction: 'IN (SIM)', source: '192.168.4.1:80', payload: sampleJson);
+        direction: 'IN (SIM)',
+        source: '192.168.4.1:$defaultPort',
+        payload: sampleJson,
+      );
 
       _setConnected(true);
       _resetWatchdog();
@@ -166,45 +319,6 @@ class HttpRobotService {
       }
     } catch (e) {
       _addLog(direction: 'ERR', source: 'SIM', payload: '$e', isError: true);
-    }
-  }
-
-  /// Mengirim command GET request ke robot (misal "/start-map", "/cmd?act=fwd")
-  Future<bool> sendCommand(String endpoint) async {
-    while (_isRequesting) {
-      await Future.delayed(const Duration(milliseconds: 50));
-    }
-    _isRequesting = true;
-    try {
-      final url = '$_baseUrl$endpoint';
-      _requestsSent++;
-
-      _addLog(direction: 'OUT', source: url, payload: 'GET $endpoint');
-      debugPrint('[HTTP Send] Sending GET $endpoint to $_baseUrl');
-
-      final response = await http.get(Uri.parse(url)).timeout(
-            const Duration(seconds: 2),
-          );
-
-      if (response.statusCode == 200) {
-        _handleIncomingResponse(response.body);
-        return true;
-      } else {
-        return false;
-      }
-    } catch (e) {
-      _addLog(
-          direction: 'ERR',
-          source: 'SEND',
-          payload: 'Gagal request "$endpoint": $e',
-          isError: true);
-      debugPrint('[HTTP Send Error] Failed to send to $endpoint: $e');
-      return false;
-    } finally {
-      // JEDA 400ms sebelum ngebolehin request lain jalan
-      Future.delayed(const Duration(milliseconds: 400), () {
-        _isRequesting = false;
-      });
     }
   }
 
@@ -258,8 +372,13 @@ class HttpRobotService {
 
   void _resetWatchdog() {
     _watchdogTimer?.cancel();
-    _watchdogTimer = Timer(const Duration(milliseconds: 3500), () {
-      debugPrint('[HTTP Watchdog] No packets received for 3.5s -> OFFLINE');
+    // Di mode 1-arah murni, polling background sengaja dihentikan demi keutuhan bandwidth kemudi.
+    // Robot hanya dianggap OFFLINE jika request perintah tombol gagal / timeout.
+    if (_isOneWayManualMode) {
+      return;
+    }
+    _watchdogTimer = Timer(const Duration(milliseconds: 9000), () {
+      debugPrint('[HTTP Watchdog] No packets received for 9.0s -> OFFLINE');
       _setConnected(false);
     });
   }
@@ -268,6 +387,7 @@ class HttpRobotService {
   Future<void> stopPolling() async {
     _pollingTimer?.cancel();
     _watchdogTimer?.cancel();
+    _queue.clear();
     _setConnected(false);
   }
 

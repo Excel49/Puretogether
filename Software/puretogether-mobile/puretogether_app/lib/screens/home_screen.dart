@@ -16,7 +16,9 @@ class HomeScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: AppTheme.background,
           body: SafeArea(
-            child: SingleChildScrollView(
+            child: RefreshIndicator(
+              onRefresh: () => provider.fetchTelemetryOnce(),
+              child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,15 +174,17 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           label: 'Robot Status',
-                          value: data.robotMode == 'AUTO' ? 'Patrol' : 'Manual',
+                          value: data.robotMode == 'AUTO'
+                              ? 'Patrol'
+                              : (data.robotMode == 'IDLE' ? 'Idle (Siaga)' : 'Manual'),
                           subtitle: data.robotMode == 'AUTO'
                               ? 'Running routine'
-                              : 'Manual control',
+                              : (data.robotMode == 'IDLE' ? 'Data masuk live' : 'Manual control'),
                           subtitleColor: AppTheme.textSecondary,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Current Line Card
+                      // Battery Voltage Card (Li-ion 2S 7.4V)
                       Expanded(
                         child: _buildMetricCard(
                           iconWidget: Container(
@@ -191,16 +195,14 @@ class HomeScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
-                              Icons.alt_route_rounded,
+                              Icons.bolt_rounded,
                               color: AppTheme.primary,
                               size: 20,
                             ),
                           ),
-                          label: 'Current Line',
-                          value: 'Line ${data.currentLine ?? 'B'}',
-                          subtitle: data.robotMode == 'AUTO'
-                              ? 'Auto following'
-                              : 'Standby',
+                          label: 'Battery Voltage',
+                          value: '${data.batteryVoltage.toStringAsFixed(1)} V',
+                          subtitle: 'Li-ion 2S (7.4V)',
                           subtitleColor: AppTheme.textSecondary,
                         ),
                       ),
@@ -221,21 +223,12 @@ class HomeScreen extends StatelessWidget {
                           color: Color(0xFF0F1E36),
                         ),
                       ),
-                      InkWell(
-                        onTap: () {
-                          // Tab switch to Alerts can be performed if needed
-                        },
-                        borderRadius: BorderRadius.circular(6),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          child: Text(
-                            'View All',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primary,
-                            ),
-                          ),
+                      Text(
+                        provider.alerts.isNotEmpty ? '${provider.alerts.length} Notifikasi' : 'Terbaru',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
                         ),
                       ),
                     ],
@@ -243,80 +236,143 @@ class HomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 10),
 
-                  // Orange-tinted Recent Alert Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB), // Soft warm amber tint
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFD97706).withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  // Dynamic Alert Card
+                  if (provider.alerts.isNotEmpty) ...[
+                    Builder(builder: (_) {
+                      final latest = provider.alerts.first;
+                      final isHazard = latest.type == 'DUST_HIGH' || latest.type == 'ROBOT_OFFLINE';
+                      final isWarning = latest.type == 'BATTERY_LOW';
+                      final cardBg = isHazard
+                          ? const Color(0xFFFEF2F2)
+                          : (isWarning ? const Color(0xFFFFFBEB) : const Color(0xFFF0FDF4));
+                      final borderColor = isHazard
+                          ? const Color(0xFFFECACA)
+                          : (isWarning ? const Color(0xFFFDE68A) : const Color(0xFFBBF7D0));
+                      final iconColor = isHazard
+                          ? const Color(0xFFDC2626)
+                          : (isWarning ? const Color(0xFFD97706) : const Color(0xFF16A34A));
+                      final timeStr =
+                          '${latest.timestamp.hour.toString().padLeft(2, '0')}:${latest.timestamp.minute.toString().padLeft(2, '0')}';
+
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor, width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: iconColor.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.warning_amber_rounded,
-                            color: Color(0xFFD97706),
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Dust level slightly high',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF92400E),
-                                ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: iconColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              SizedBox(height: 3),
-                              Text(
-                                'Dust at 85 µg/m³ (near threshold)',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Color(0xFF78350F),
-                                ),
+                              child: Icon(
+                                isHazard
+                                    ? Icons.warning_rounded
+                                    : (isWarning ? Icons.battery_alert_rounded : Icons.check_circle_rounded),
+                                color: iconColor,
+                                size: 22,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isHazard
+                                        ? 'Peringatan Bahaya'
+                                        : (isWarning ? 'Peringatan Baterai' : 'Informasi Sistem'),
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: iconColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    latest.message,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              timeStr,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: iconColor,
+                              ),
+                            ),
+                          ],
                         ),
-                        const Text(
-                          '10:24 AM',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFB45309),
+                      );
+                    }),
+                  ] else ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 22),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Semua Sistem Normal',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Kualitas udara aman dan robot siap dioperasikan.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
 
                   const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }

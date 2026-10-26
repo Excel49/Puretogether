@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PureTogether - Local Controller</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #121212;
+            color: #fff;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #00bcd4;
+            margin-bottom: 5px;
+        }
+
+        p.subtitle {
+            color: #aaa;
+            margin-top: 0;
+        }
+
+        .card {
+            background: #1e1e1e;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 400px;
+            margin: 20px auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .keys-container {
+            margin: 20px 0;
+        }
+
+        .key-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .key {
+            width: 60px;
+            height: 60px;
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #aaa;
+            transition: 0.1s;
+        }
+
+        .key.active {
+            background: #00bcd4;
+            color: #121212;
+            border-color: #00bcd4;
+            transform: scale(0.95);
+        }
+
+        .slider-container {
+            margin: 30px 0;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        #dustVal {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .btn-red {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-green {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-blue {
+            background: #2196f3;
+            color: white;
+        }
+
+        .btn-off {
+            background: #555;
+            color: white;
+        }
+
+        #status {
+            margin-top: 20px;
+            color: #ccc;
+            font-size: 14px;
+            font-family: monospace;
+            text-align: left;
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>PureTogether</h1>
+    <p class="subtitle">Local Hardware Tester (No Flutter)</p>
+
+    <div class="card">
+        <h3>Mobilitas (Gunakan WASD)</h3>
+        <div class="keys-container">
+            <div class="key-row">
+                <div class="key" id="key-W">W</div>
+            </div>
+            <div class="key-row">
+                <div class="key" id="key-A">A</div>
+                <div class="key" id="key-S">S</div>
+                <div class="key" id="key-D">D</div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 15px;">
+            <div class="key" id="key-L" style="border-radius: 50%; color: #ffeb3b; border-color: #ffeb3b;">L</div>
+            <p style="align-self: center; margin:0; color:#ffeb3b;">Tahan "L" untuk Buzzer</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Injeksi Layar LCD (Sensor Dummy)</h3>
+        <div class="slider-container">
+            <input type="range" id="dustSlider" min="0" max="250" value="0" oninput="updateDustDisp(this.value)"
+                onchange="sendDust(this.value)">
+            <p>Debu (ug/m3): <span id="dustVal">0</span></p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Koreografi Otomatis</h3>
+        <button class="btn-green" onclick="runChoreo()" id="choreoBtn" style="width: 100%;">TARI: MAJU > SERONG
+            KIRI</button>
+    </div>
+
+    <div class="card">
+        <h3>Tes Indikator LED</h3>
+        <div class="btn-group">
+            <button class="btn-red" onclick="sendCommand('/dummy?led=red')">MERAH</button>
+            <button class="btn-green" onclick="sendCommand('/dummy?led=green')">HIJAU</button>
+            <button class="btn-blue" onclick="sendCommand('/dummy?led=blue')">BIRU</button>
+            <button class="btn-off" onclick="sendCommand('/dummy?led=off')">MATI</button>
+        </div>
+    </div>
+
+    <div id="status">Status: Standby. Hubungkan ke SSID PureTogether terlebih dahulu!</div>
+
+    <script>
+        const IP = '192.168.4.1:8888';
+        let currentKey = null;
+        const logger = document.getElementById('status');
+
+        function sendCommand(path) {
+            if (!path) return;
+            logger.innerText = `Menyelipkan perintah: ${path} ...`;
+
+            // HACK: Jika sebelumnya kita memaksakan bunuh setelah 150ms,
+            // ternyata instruksi penting ("Berhenti") terbunuh sebelum dikirim!
+            // Sekarang biarkan browser menyelesaikan kirimannya sepenuhnya agar tidak bocor.
+            fetch(`http://${IP}${path}`, { mode: 'no-cors' })
+                .then(() => logger.innerText = `Sukses terkirim: ${path}`)
+                .catch(e => logger.innerText = `Catatan: ${path}`);
+        }
+
+        // SLIDER
+        function updateDustDisp(val) { document.getElementById('dustVal').innerText = val; }
+        function sendDust(val) { sendCommand(`/dummy?dust=${val}`); }
+
+        // KOREOGRAFI LOGIC
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        async function runChoreo() {
+            const btn = document.getElementById('choreoBtn');
+            btn.innerText = "KOREOGRAFI SEDANG BERJALAN...";
+            btn.className = "btn-red";
+            btn.disabled = true;
+
+            try {
+                // 1. Maju 20 Detik
+                sendCommand('/cmd?act=fwd');
+                await sleep(20000);
+
+                // 2. Serong Kiri 2 Detik
+                sendCommand('/cmd?act=sleft');
+                await sleep(2000);
+
+                // 3. Serong Kiri 2 Detik (Diteruskan lagi sesuai permintaan)
+                sendCommand('/cmd?act=sleft');
+                await sleep(2000);
+
+                // 4. Maju 5 Detik
+                sendCommand('/cmd?act=fwd');
+                await sleep(5000);
+
+                // 5. Serong Kiri 2 Detik
+                sendCommand('/cmd?act=sleft');
+                await sleep(2000);
+
+                // 6. Serong Kiri 2 Detik
+                sendCommand('/cmd?act=sleft');
+                await sleep(2000);
+
+                // 7. Maju 20 Detik
+                sendCommand('/cmd?act=fwd');
+                await sleep(20000);
+
+                // Berhenti total
+                sendCommand('/cmd?act=stop');
+                alert("Koreografi Seleasi dengan Selamat!");
+            } catch (e) {
+                alert("Koreografi Terganggu!");
+            }
+
+            // Restore button
+            btn.innerText = "TARI: MAJU > SERONG KIRI";
+            btn.className = "btn-green";
+            btn.disabled = false;
+        }
+
+        // WASD & L BINDINGS
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return; // ignore holding 
+            const k = e.key.toUpperCase();
+            let el = document.getElementById(`key-${k}`);
+            if (el) el.classList.add('active');
+
+            if (k === 'W') { currentKey = 'W'; sendCommand('/cmd?act=right'); }
+            else if (k === 'S') { currentKey = 'S'; sendCommand('/cmd?act=left'); }
+            else if (k === 'A') { currentKey = 'A'; sendCommand('/cmd?act=rev'); }
+            else if (k === 'D') { currentKey = 'D'; sendCommand('/cmd?act=fwd'); }
+            else if (k === 'L') { currentKey = 'L'; sendCommand('/dummy?buzz=1'); }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const k = e.key.toUpperCase();
+            let el = document.getElementById(`key-${k}`);
+            if (el) el.classList.remove('active');
+
+            if (['W', 'A', 'S', 'D'].includes(k)) {
+                if (currentKey === k) {
+                    sendCommand('/cmd?act=stop');
+                    currentKey = null;
+                } else {
+                    // If a different movement key is still held, send its command again
+                    sendCommand('/cmd?act=stop'); // Safest default is to stop
+                }
+            } else if (k === 'L') {
+                sendCommand('/dummy?buzz=0');
+            }
+        });
+
+    </script>
+</body>
+
+</html>
